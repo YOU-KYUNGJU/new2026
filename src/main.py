@@ -17,12 +17,33 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
 # exe 파일만들기(권장)
-# pyinstaller --onefile --windowed FITI_PDF_ReportSplitter_vN_YYYYMMDD.py
+# pyinstaller --onefile --windowed --name FITI_PDF_ReportSplitter main.py
+# pyinstaller FITI_PDF_ReportSplitter.spec
 
+__version__ = "3.6.0"
 # ================== 설정 파일 로드 ==================
 def load_config():
     config = configparser.ConfigParser()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')
+    
+    # 우선순위:
+    # 1. 실행 파일(또는 스크립트)과 같은 폴더 (배포판/단일폴더)
+    # 2. 상위 폴더의 config/config.ini (개발환경: src/main.py -> config/config.ini)
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 1. 같은 폴더
+    path_same_dir = os.path.join(base_dir, 'config.ini')
+    
+    # 2. ../config/config.ini
+    path_dev_dir = os.path.join(os.path.dirname(base_dir), 'config', 'config.ini')
+
+    if os.path.exists(path_same_dir):
+        config_path = path_same_dir
+    elif os.path.exists(path_dev_dir):
+        config_path = path_dev_dir
+    else:
+        # 없으면 기본값으로 같은 폴더에 생성
+        config_path = path_same_dir
 
     # 기본값 설정
     defaults = {
@@ -49,8 +70,14 @@ def load_config():
     if not os.path.exists(config_path):
         # 설정 파일이 없으면 기본값으로 생성
         config.read_dict(defaults)
-        with open(config_path, 'w', encoding='utf-8') as f:
-            config.write(f)
+        # config 폴더가 없으면 생성 시도 (개발환경 고려)
+        try:
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w', encoding='utf-8') as f:
+                config.write(f)
+        except Exception:
+            # 실패하면 그냥 메모리 상의 기본값 사용
+            pass
     else:
         config.read(config_path, encoding='utf-8')
 
