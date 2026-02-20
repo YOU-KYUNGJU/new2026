@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import sys
 import time
@@ -8,6 +8,7 @@ import configparser
 import gc  # Garbage Collection explicit call
 from datetime import datetime
 from collections import deque
+from threading import Lock
 
 from pdf2image import convert_from_path
 import pytesseract
@@ -180,6 +181,12 @@ def file_is_stable(path: str) -> bool:
 RUN_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 SPLIT_OUTPUT_DIR = os.path.join(RUN_DIR, "split_output")
 os.makedirs(SPLIT_OUTPUT_DIR, exist_ok=True)
+
+# ================== 텍스트 로그 파일 ==================
+LOG_DIR = os.path.join(RUN_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(LOG_DIR, f"FITI_PDF_ReportSplitter_{datetime.now().strftime('%Y%m%d')}.txt")
+log_file_lock = Lock()
 
 def resolve_base_root(primary_root: str) -> str:
     """
@@ -562,6 +569,14 @@ exit_btn.pack(side="right")
 
 
 def append_log(s: str):
+    # 화면 로그와 별도로 txt 파일에도 누적 저장
+    try:
+        with log_file_lock:
+            with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+                f.write(s + "\n")
+    except Exception:
+        pass
+
     def _append():
         txt.insert("end", s + "\n")
         txt.see("end")
