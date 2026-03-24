@@ -62,9 +62,9 @@ def load_config():
             'STABLE_RETRY': '3'
         },
         'SERVER': {
-            'BASE_ROOT_PH': r"\\192.168.1.7\유해물질시험팀\3. 폼알데히드,pH파트\pH\RDMS\H111분석일지 SCAN",
-            'BASE_ROOT_FORMALDEHYDE': r"\\192.168.1.7\유해물질시험팀\3. 폼알데히드,pH파트\FORMALDEHYDE\RDMS\완료",
-            'ALT_SERVER_NAME': r"\\fiti_fileserver"
+            'BASE_ROOT_PH': '',
+            'BASE_ROOT_FORMALDEHYDE': '',
+            'ALT_SERVER_NAME': ''
         }
     }
 
@@ -96,9 +96,9 @@ SCAN_INTERVAL_SEC = CONFIG['WATCHER'].getfloat('SCAN_INTERVAL_SEC', 1.0)
 STABLE_CHECK_SEC = CONFIG['WATCHER'].getfloat('STABLE_CHECK_SEC', 0.7)
 STABLE_RETRY = CONFIG['WATCHER'].getint('STABLE_RETRY', 3)
 
-BASE_ROOT_PH = CONFIG['SERVER'].get('BASE_ROOT_PH', r"\\192.168.1.7\유해물질시험팀\3. 폼알데히드,pH파트\pH\RDMS\H111분석일지 SCAN")
-BASE_ROOT_FORMALDEHYDE = CONFIG['SERVER'].get('BASE_ROOT_FORMALDEHYDE', r"\\192.168.1.7\유해물질시험팀\3. 폼알데히드,pH파트\FORMALDEHYDE\RDMS\완료")
-ALT_SERVER_NAME = CONFIG['SERVER'].get('ALT_SERVER_NAME', r"\\fiti_fileserver")
+BASE_ROOT_PH = CONFIG.get('SERVER', 'BASE_ROOT_PH', fallback='').strip()
+BASE_ROOT_FORMALDEHYDE = CONFIG.get('SERVER', 'BASE_ROOT_FORMALDEHYDE', fallback='').strip()
+ALT_SERVER_NAME = CONFIG.get('SERVER', 'ALT_SERVER_NAME', fallback='').strip()
 # =============================================
 
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_EXE
@@ -190,17 +190,24 @@ log_file_lock = Lock()
 
 def resolve_base_root(primary_root: str) -> str:
     """
-    \\192.168.1.7 경로가 실제로 존재하지 않으면 \\fiti_fileserver 로 대체
+    Return the configured server root, or swap the UNC host when a fallback is set.
     """
+    if not primary_root:
+        return ""
+
     try:
         if os.path.exists(primary_root):
             return primary_root
     except Exception:
         pass
 
-    # 서버명 대체
-    alt_root = primary_root.replace(r"\\192.168.1.7", ALT_SERVER_NAME, 1)
-    return alt_root
+    if ALT_SERVER_NAME and primary_root.startswith("\\\\"):
+        parts = primary_root.split("\\", 3)
+        if len(parts) >= 4:
+            return ALT_SERVER_NAME.rstrip("\\") + "\\" + parts[3]
+        return ALT_SERVER_NAME
+
+    return primary_root
 
 
 def get_output_dir_by_rdms(rdms_code: str) -> str:
@@ -218,12 +225,12 @@ def get_output_dir_by_rdms(rdms_code: str) -> str:
     yyyymmdd = today.strftime("%Y%m%d")
 
     if code == "P":
-        base_root = resolve_base_root(BASE_ROOT_PH)  # ✅ Config 적용
-        out_dir = os.path.join(base_root, yyyy, mm, yyyymmdd)
+        base_root = resolve_base_root(BASE_ROOT_PH)  # ??Config ???
+        out_dir = os.path.join(base_root, yyyy, mm, yyyymmdd) if base_root else SPLIT_OUTPUT_DIR
 
     elif code == "F":
-        base_root = resolve_base_root(BASE_ROOT_FORMALDEHYDE)  # ✅ Config 적용
-        out_dir = os.path.join(base_root, yyyy, mm, yyyymmdd)
+        base_root = resolve_base_root(BASE_ROOT_FORMALDEHYDE)  # ??Config ???
+        out_dir = os.path.join(base_root, yyyy, mm, yyyymmdd) if base_root else SPLIT_OUTPUT_DIR
 
     else:
         out_dir = SPLIT_OUTPUT_DIR
